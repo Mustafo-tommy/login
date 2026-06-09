@@ -17,11 +17,13 @@ export function AuthProvider({ children }) {
   const login = async (data) => {
     const user = await authService.login(data);
     setUser(user);
+    return user; // 👈 возвращаем юзера
   };
 
   const register = async (data) => {
     const user = await authService.register(data);
     setUser(user);
+    return user; // 👈 возвращаем юзера
   };
 
   const logout = async () => {

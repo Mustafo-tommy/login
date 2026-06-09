@@ -1,22 +1,25 @@
 import { useState } from "react";
 import { useAuth } from "../context/AuthContext.jsx";
+import { useNavigate } from "react-router-dom";
 
 function LoginPage() {
   const { login, register } = useAuth();
+  const navigate = useNavigate();
   const [isLogin, setIsLogin] = useState(true);
   const [form, setForm] = useState({
     name: "",
     email: localStorage.getItem("savedEmail") || "",
     password: "",
+    role: "user",
   });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
   const handleChange = (e) => {
-    const updated = { ...form, [e.target.name]: e.target.value };
-    setForm(updated);
-    if (e.target.name === "email") {
-      localStorage.setItem("savedEmail", e.target.value);
+    const { name, value } = e.target;
+    setForm((prev) => ({ ...prev, [name]: value }));
+    if (name === "email") {
+      localStorage.setItem("savedEmail", value);
     }
   };
 
@@ -25,14 +28,22 @@ function LoginPage() {
     setError("");
     setLoading(true);
     try {
+      let user;
       if (isLogin) {
-        await login({ email: form.email, password: form.password });
+        user = await login({ email: form.email, password: form.password });
       } else {
-        await register({
+        user = await register({
           name: form.name,
           email: form.email,
           password: form.password,
+          role: form.role,
         });
+      }
+
+      if (user?.role === "admin") {
+        navigate("/about");
+      } else {
+        navigate("/home");
       }
     } catch (err) {
       setError(err.message);
@@ -47,14 +58,38 @@ function LoginPage() {
         <h2>{isLogin ? "Войти" : "Регистрация"}</h2>
         <form onSubmit={handleSubmit}>
           {!isLogin && (
-            <input
-              className="auth-input"
-              name="name"
-              placeholder="Имя"
-              value={form.name}
-              onChange={handleChange}
-              required
-            />
+            <>
+              <input
+                className="auth-input"
+                name="name"
+                placeholder="Имя"
+                value={form.name}
+                onChange={handleChange}
+                required
+              />
+              <div style={{ display: "flex", gap: "20px", margin: "10px 0" }}>
+                <label style={{ color: "white", cursor: "pointer" }}>
+                  <input
+                    type="radio"
+                    name="role"
+                    value="user"
+                    checked={form.role === "user"}
+                    onChange={handleChange}
+                  />{" "}
+                  User
+                </label>
+                <label style={{ color: "white", cursor: "pointer" }}>
+                  <input
+                    type="radio"
+                    name="role"
+                    value="admin"
+                    checked={form.role === "admin"}
+                    onChange={handleChange}
+                  />{" "}
+                  Admin
+                </label>
+              </div>
+            </>
           )}
           <input
             className="auth-input"
