@@ -4,6 +4,7 @@ import express from "express";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import userModel from "../models/user.model.js";
+import { authMiddleware } from "../middlewares/auth.js";
 
 const router = express.Router();
 const JWT_SECRET = process.env.JWT_SECRET;
@@ -16,14 +17,14 @@ if (!JWT_SECRET) {
 const COOKIE_OPTIONS = {
   httpOnly: true,
   secure: process.env.NODE_ENV === "production",
-  sameSite: "strict",
-  maxAge: 24 * 60 * 60 * 1000, // 1 день
+  sameSite: "lax",
+  maxAge: 24 * 60 * 60 * 1000,
 };
-
 
 router.post("/register", async (req, res) => {
   try {
-    const { name, email, password } = req.body;
+    const { name, email, password, role } = req.body;
+    console.log("req.body:", req.body); // 👈
 
     if (!name || !email || !password)
       return res
@@ -41,14 +42,22 @@ router.post("/register", async (req, res) => {
       name,
       email,
       password: passwordHash,
+      role: role || "user",
     });
+
+    console.log("user created:", user.role); // 👈
 
     const token = jwt.sign({ id: user._id }, JWT_SECRET, { expiresIn: "1d" });
 
     res.cookie("token", token, COOKIE_OPTIONS);
     res.status(201).json({
       message: "User registered successfully",
-      user: { id: user._id, name: user.name, email: user.email },
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+      },
     });
   } catch (err) {
     res.status(500).json({ message: "Server error", error: err.message });
@@ -79,29 +88,21 @@ router.post("/login", async (req, res) => {
     res.cookie("token", token, COOKIE_OPTIONS);
     res.json({
       message: "Login successful",
-      user: { id: user._id, name: user.name, email: user.email },
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+      },
     });
   } catch (err) {
     res.status(500).json({ message: "Server error", error: err.message });
   }
 });
 
-
-router.get("/me", async (req, res) => {
-  try {
-    const token = req.cookies?.token;
-    if (!token) return res.status(401).json({ message: "Not authenticated" });
-
-    const decoded = jwt.verify(token, JWT_SECRET);
-    const user = await userModel.findById(decoded.id).select("-password");
-    if (!user) return res.status(404).json({ message: "User not found" });
-
-    res.json({ user });
-  } catch {
-    res.status(401).json({ message: "Invalid or expired token" });
-  }
+router.get("/me", authMiddleware, (req, res) => {
+  res.json({ user: req.user });
 });
-
 
 router.post("/logout", (req, res) => {
   res.clearCookie("token", COOKIE_OPTIONS);
